@@ -206,7 +206,7 @@ class GCC_Commands(cmd.Cmd):
 
         # Parsing inputs
         args = arg_to_argv(arg)
-        if len(args) != 1:
+        if len(args) > 2:
             logger.info("Invalid argument amount, see help\n")
             return
 
@@ -215,17 +215,23 @@ class GCC_Commands(cmd.Cmd):
             logger.info("Invalid argument - must be either ""amplitude"" or ""distance""")
             return
 
-        while True:
-            userInput = input('Do you wish to save raw image data when saving images? Enter ''yes'' or ''no'':\n')
-            if userInput == 'yes' or userInput == 'YES' or userInput == 'Yes':
+        if len(args) == 1:
+            while True:
+                userInput = input('Do you wish to save raw image data when saving images? Enter ''yes'' or ''no'': ')
+                if userInput == 'yes' or userInput == 'YES' or userInput == 'Yes':
+                    save_image_data = True
+                    break
+                elif userInput == 'no' or userInput == 'NO' or userInput == 'No':
+                    save_image_data = False
+                    break
+                else:
+                    print('Unrecognized input. Must be ''yes'' or ''no''')
+        else:
+            if args[1] == 'y':
                 save_image_data = True
-                break
-            elif userInput == 'no' or userInput == 'NO' or userInput == 'No':
-                save_image_data = False
-                break
             else:
-                print('Unrecognized input. Must be ''yes'' or ''no''')
-
+                save_image_data = False
+            
         # Creating a window to display the stream
         cv2.namedWindow('Stream - Press ''enter'' to exit', cv2.WINDOW_NORMAL)
         print('Stream started - Press ''enter'' to exit'' or press ''spacebar'' to save an image')
