@@ -9,10 +9,22 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
-from pyreadline3 import Readline
 import time
+import platform
 
-readline = Readline()  # enables tab-autocomplete
+
+# ROS dependencies
+if platform.system() == 'Linux':
+    from ros_start import *
+
+# enables autocomplete on Windows, cause apparently
+# # python doesn't ship with a version of readline that
+# # works on Windows
+# # further proof that Windows is a horrible OS
+# # and this year is the year of the Linux desktop
+if platform.system() == 'Windows':
+    from pyreadline3 import Readline
+    readline = Readline()  # enables tab-autocomplete
 
 # Define IPv4 address for the ToF camera
 PORT = 50660
@@ -73,6 +85,31 @@ class GCC_Commands(cmd.Cmd):
     intro = "Welcome to GCC ToF camera CLI (use help for list of commands)"
     prompt = "_GCC_TOF_CAM_: "
     ruler = ""
+
+    ###########################################################################
+    #                                ROS Stuff                                #
+    ###########################################################################
+    def preloop(self):
+        try:
+            ROS_preloop(self)
+        except NameError:
+            # do nothing cause ROS code not here :(
+            # bullying will continue until OS improves
+            print("Error: your OS choice is disturbing")
+
+    def postloop(self):
+        try:
+            ROS_postloop(self)
+        except NameError:
+            # do nothing cause ROS code not here :(
+            print("Error: error.")
+
+    def do_ros(self, arg):
+        "Streams amplify and distance image to ROS"
+        try:
+            stream_amp_and_dist_over_ROS(self)
+        except NameError:
+            print("ERROR: ROS is not installed, delete System32")
 
     ###############################################################################
     # Backscatter Methods
@@ -212,7 +249,7 @@ class GCC_Commands(cmd.Cmd):
 
         stream_type = args[0]
         if (stream_type != 'amplitude' and stream_type != 'a' and stream_type != 'distance' and stream_type != 'd'):
-            logger.info("Invalid argument - must be either ""amplitude"" or ""distance""")
+            logger.info("Invalid argument - must be either 'amplitude' or 'distance'")
             return
 
         if len(args) == 1:
@@ -225,7 +262,7 @@ class GCC_Commands(cmd.Cmd):
                     save_image_data = False
                     break
                 else:
-                    print('Unrecognized input. Must be ''yes'' or ''no''')
+                    print("Unrecognized input. Must be 'yes' or 'no'")
         else:
             if args[1] == 'y':
                 save_image_data = True
