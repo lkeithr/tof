@@ -6,7 +6,6 @@ import cv2
 import struct
 
 REMOTE_IP = '192.168.6.100'
-# REMOTE_IP = '10.15.0.2'
 buffer = 8192
 PORT = 50660
 

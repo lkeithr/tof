@@ -6,19 +6,22 @@ import logging
 import sys
 import cv2
 import os
-import platform
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import numpy as np
+from pyreadline3 import Readline
+import time
+
 
 # ROS dependencies
 if platform.system() == 'Linux':
     from ros_start import ROS_preloop, ROS_postloop, stream_amp_and_dist_over_ROS
 
 # enables autocomplete on Windows, cause apparently
-# python doesn't ship with a version of readline that
-# works on Windows
-# further proof that Windows is a horrible OS
-# and this year is the year of the Linux desktop
+# # python doesn't ship with a version of readline that
+# # works on Windows
+# # further proof that Windows is a horrible OS
+# # and this year is the year of the Linux desktop
 if platform.system() == 'Windows':
     from pyreadline3 import Readline
     readline = Readline()  # enables tab-autocomplete
@@ -42,24 +45,40 @@ logger.addHandler(console_log)
 ''' colormap link: https://www.analyticsvidhya.com/blog/2020/09/colormaps-matplotlib/
     (reference this site to choose your colormap)'''
 CM = plt.get_cmap('jet')
+cmap = mpl.cm.jet
 backscatter_phasor = np.zeros((240, 320))  # default backscatter phasor
 index_of_refraction = 1.334  # default index of refraction (for water)
 mod_freq = 12e6
 mod_freq_str = "12MHz"
 speed_of_light = 2.998e8
 working_dir = ""  # default image savepath
-experiment_name = "" # default experiment scene
-is_corrected = False # tracks whether backscatter subtraction is occuring
-integration_time = int(13) # default integration time
-use_count_data = False # determines data aquisition method
-distance_colormap = "normalized" # determines how the distance colormap is scaled
+experiment_name = ""  # default experiment scene
+is_corrected = False  # tracks whether backscatter subtraction is occuring
+integration_time = int(13)  # default integration time
+use_count_data = False  # determines data aquisition method
+distance_colormap = "normalized"  # determines how the distance colormap is scaled
 half_wavelength = speed_of_light / (2 * index_of_refraction * mod_freq)
+max_distance_cm = half_wavelength * 100  #Theoretically, the maximum distance reading espros will ever give
+min_distance_cm = 0 
+user_max_distance_cm = max_distance_cm
+user_min_distance_cm = 0
+enable_red_box = False # puts a red box in the center of the image (used for distance testing)
+enable_median_filter = False
+median_filter_kernel = 5
+enable_low_pass_filter = False
+low_pass_filter_kernel = 5
+
 
 # Default color mapping thresholds (img values are 8-bit)
 cm_min_amp = 0
 cm_max_amp = 255
-cm_min_dist = 0
-cm_max_dist = 255
+cm_min_dist = 0 #can be deleted
+cm_max_dist = 255 #can be deleted
+
+#mpl.rcParams['interactive'] = False
+font = {'family': 'arial', 'weight': 'bold', 'size': 20}
+mpl.rc('font', **font)
+plt.ioff()
 
 class GCC_Commands(cmd.Cmd):
     logging.info("_GCC_TOF_CAM_ started successfully")
@@ -95,7 +114,6 @@ class GCC_Commands(cmd.Cmd):
         except NameError:
             print("ERROR: ROS is not installed, delete System32")
 
-
     ###############################################################################
     # Backscatter Methods
     ###############################################################################
@@ -114,7 +132,7 @@ class GCC_Commands(cmd.Cmd):
 
         global backscatter_phasor, is_corrected
 
-        backscatter_phasor = np.zeros((240, 320)) # zeros the backscatter phasor before characterizing
+        backscatter_phasor = np.zeros((240, 320))  # zeros the backscatter phasor before characterizing
 
         # Calculating wavelength in mm
         wavelength_mm = speed_of_light * 1000 / (index_of_refraction * mod_freq)
@@ -125,7 +143,6 @@ class GCC_Commands(cmd.Cmd):
 
         # Looping through desired number of samples and keeping a running average
         for i in range(0, num_samples):
-
             amplitude_data, phase_data = get_image('phasor_data', True)
             backscatter_amplitude += amplitude_data
             backscatter_phase += phase_data
@@ -165,12 +182,12 @@ class GCC_Commands(cmd.Cmd):
         print(backscatter_phasor)
 
         # Getting phase and converting to distance
-        #wavelength_mm = speed_of_light * 1000 / (index_of_refraction * mod_freq)
-        #backscatter_phase = wrapTo2Pi(np.arctan2(backscatter_phasor.imag, backscatter_phasor.real))
-        #img = (backscatter_phase * wavelength_mm / (4 * np.pi)).astype(int)
-        
+        # wavelength_mm = speed_of_light * 1000 / (index_of_refraction * mod_freq)
+        # backscatter_phase = wrapTo2Pi(np.arctan2(backscatter_phasor.imag, backscatter_phasor.real))
+        # img = (backscatter_phase * wavelength_mm / (4 * np.pi)).astype(int)
+
         # Getting amplitude and converting to image
-        img = np.sqrt(backscatter_phasor.real**2 + backscatter_phasor.imag**2)
+        img = np.sqrt(backscatter_phasor.real ** 2 + backscatter_phasor.imag ** 2)
 
         colored_image = CM(img.astype(int))
         print(colored_image)
@@ -188,9 +205,9 @@ class GCC_Commands(cmd.Cmd):
     ###############################################################################
     # Imaging Methods
     ###############################################################################
-    
+
     # ======================= NHS
-    
+
     def do_set_data_mode(self, arg):
         "Determines whether to use count data or DCS data, Input is either 'count' or 'DCS'"
         args = arg_to_argv(arg)
@@ -207,9 +224,9 @@ class GCC_Commands(cmd.Cmd):
         else:
             use_count_data = False
             print("Using DCS data")
-        
+
     # ======================= NHS
-    
+
     def do_get_data_mode(self, arg):
         "Prints the current data collection mode"
         if use_count_data:
@@ -229,28 +246,35 @@ class GCC_Commands(cmd.Cmd):
 
         # Parsing inputs
         args = arg_to_argv(arg)
-        if len(args) != 1:
+        if len(args) > 2:
             logger.info("Invalid argument amount, see help\n")
             return
 
         stream_type = args[0]
         if (stream_type != 'amplitude' and stream_type != 'a' and stream_type != 'distance' and stream_type != 'd'):
-            logger.info("Invalid argument - must be either 'amplitude' or 'distance'")
+            logger.info("Invalid argument - must be either ""amplitude"" or ""distance""")
             return
 
-        while True:
-            userInput = input('Do you wish to save raw image data when saving images? Enter ''yes'' or ''no'': ')
-            if userInput == 'yes' or userInput == 'YES' or userInput == 'Yes':
+        if len(args) == 1:
+            while True:
+                userInput = input('Do you wish to save raw image data when saving images? Enter ''yes'' or ''no'': ')
+                if userInput == 'yes' or userInput == 'YES' or userInput == 'Yes':
+                    save_image_data = True
+                    break
+                elif userInput == 'no' or userInput == 'NO' or userInput == 'No':
+                    save_image_data = False
+                    break
+                else:
+                    print('Unrecognized input. Must be ''yes'' or ''no''')
+        else:
+            if args[1] == 'y':
                 save_image_data = True
-                break
-            elif userInput == 'no' or userInput == 'NO' or userInput == 'No':
-                save_image_data = False
-                break
             else:
-                print('Unrecognized input. Must be "yes" or "no"')
-
+                save_image_data = False
+            
         # Creating a window to display the stream
-        cv2.namedWindow('Stream - Press ''enter'' to exit', cv2.WINDOW_NORMAL)
+        cv2.namedWindow('Stream - Press ''enter'' to exit', cv2.WINDOW_FULLSCREEN) # set to cv2.WINDOW_NORMAL?
+        cv2.setWindowProperty('Stream - Press ''enter'' to exit', cv2.WND_PROP_TOPMOST, 1)
         print('Stream started - Press ''enter'' to exit'' or press ''spacebar'' to save an image')
 
         while True:
@@ -258,18 +282,29 @@ class GCC_Commands(cmd.Cmd):
                 img_amp_data, img_dist_data, pre_img_amp_data, pre_img_dist_data = get_image('both', True)
             else:
                 img_amp_data, img_dist_data = get_image('mcdobe_sandstorm', False)
+                
 
             # Converting amplitude image to color
-            img_amp = rescale_amplitude_colormap(img_amp_data / 16) #check this, scaled from max possible amp calculation
+            img_amp = rescale_amplitude_colormap(img_amp_data)
             colored_image_amp = CM(img_amp)
             img_amp = (colored_image_amp[:, :, :3] * 255).astype(np.uint8)
             img_amp = cv2.flip(img_amp, 1)
 
             # Converting distance image to color
-            img_dist = rescale_distance_colormap(img_dist_data / 16)
+            img_dist = rescale_distance_colormap(img_dist_data)
             colored_image_dist = CM(img_dist)
             img_dist = (colored_image_dist[:, :, :3] * 255).astype(np.uint8)
             img_dist = cv2.flip(img_dist, 1)
+            
+            # Applying a median filter
+            if enable_median_filter:
+                img_amp = cv2.medianBlur(img_amp, median_filter_kernel)
+                img_dist = cv2.medianBlur(img_dist, median_filter_kernel)
+            
+            if enable_low_pass_filter:
+                img_amp = cv2.GaussianBlur(img_amp, (low_pass_filter_kernel, low_pass_filter_kernel), 0)
+                img_dist = cv2.GaussianBlur(img_dist, (low_pass_filter_kernel, low_pass_filter_kernel), 0)
+            
 
             if stream_type == 'amplitude' or stream_type == 'a':  # creating amplitude window
                 cv2.imshow('Stream - Press ''enter'' to exit', img_amp)
@@ -278,11 +313,37 @@ class GCC_Commands(cmd.Cmd):
                     # cv2.imwrite('img.jpg', img_amp)
                     break
             else:  # creating distance window
+            
+                # Creating distance colorbar
+                fig, ax = plt.subplots(figsize = (4, 4), dpi = 60)
+                norm = mpl.colors.Normalize(vmin = user_min_distance_cm, vmax = user_max_distance_cm)
+                fig.colorbar(mpl.cm.ScalarMappable(norm = norm, cmap = cmap),
+                             cax = ax, orientation = 'vertical', label = 'Distance (cm)')
+                fig.tight_layout(pad = 0)
+                ax.margins(0)
+
+                fig.canvas.draw()
+                width, height = fig.canvas.get_width_height()
+                image_from_plot = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(height, width, 3)
+                
+                # Appending colorbar to image
+                white_bar =  255*np.ones((240,20,3),dtype=np.uint8)
+                img_dist = np.concatenate((img_dist, white_bar, image_from_plot[:,180:240,:]), axis=1)
+                
+                if enable_red_box:
+                    square_width = 10
+                    start_point = (int(180 - square_width/2), int(120 - square_width/2))
+                    end_point = (int(180 + square_width/2), int(120 + square_width/2))
+                    color = (0, 0, 255)
+                    thickness = 2
+                    img_dist = cv2.rectangle(img_dist, start_point, end_point, color, thickness)
+                    
                 cv2.imshow('Stream - Press ''enter'' to exit', img_dist)
                 key = cv2.waitKey(10)
                 if key == 13:  # press enter to exit
                     break
-            
+                plt.close(fig) # closing the colorbar figure
+
             # Saving image if spacebar is pressed
             if key == 32:
                 currDateTime = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -337,7 +398,7 @@ class GCC_Commands(cmd.Cmd):
 
     # Added by Alex
     def do_disable_illuminators(self, arg):
-        "Disables camera illuminators - "
+        "Disables camera illuminators"
         s = build_tcp_connection()
         s.sendall(bytes(('enableIllumination 00' + '\n').encode('ascii')))
         print("Turned off Illuminators")
@@ -348,7 +409,7 @@ class GCC_Commands(cmd.Cmd):
     # ======================= NHS
 
     def do_enable_illuminators(self, arg):
-        "Enables camera illuminators - "
+        "Enables camera illuminators"
         s = build_tcp_connection()
         s.sendall(bytes(('enableIllumination 01' + '\n').encode('ascii')))
         print("Turned on illuminators")
@@ -398,7 +459,7 @@ class GCC_Commands(cmd.Cmd):
         return
 
     def do_get_integration_time(self, arg):
-        "Changes integration time"
+        "Prints out the current integration time"
         print(integration_time)
         return
 
@@ -425,6 +486,34 @@ class GCC_Commands(cmd.Cmd):
         "Prints the current index of refraction"
         print("The current index of refraction is", index_of_refraction)
 
+
+    # ======================== ADB
+
+    def do_restore_defaults(self, arg):
+        "Sets integration time, modulation frequency,and index of refraction to their default values for water"
+
+        # Modulation frequency = 12 MHz
+        global mod_freq, mod_freq_str, half_wavelength, max_distance_cm
+        sock = build_tcp_connection()
+        espros.do_setModulationFrequency(sock, '1')
+        mod_freq = 12e6
+        mod_freq_str = "12MHz"
+
+        # Index of refraction
+        global index_of_refraction
+        index_of_refraction = 1 #air for testing
+        half_wavelength = speed_of_light / (2 * index_of_refraction * mod_freq)
+        max_distance_cm = half_wavelength * 100
+
+        # Integration time = 100 us
+        global  integration_time
+        s = build_tcp_connection()
+        print("Integration time set to", str(100))
+        s.sendall(bytes(('setIntegrationTime3D ' + str(100) + '\n').encode('ascii')))
+        integration_time = 100
+
+
+
     ###############################################################################
     # Modulation Frequency Methods
     ###############################################################################
@@ -438,7 +527,7 @@ class GCC_Commands(cmd.Cmd):
             logger.info("Too many arguments given, see help:\n")
             return
 
-        global mod_freq, mod_freq_str, half_wavelength
+        global mod_freq, mod_freq_str, half_wavelength, max_distance_cm
         sock = build_tcp_connection()
         if args[0] == '24':
             espros.do_setModulationFrequency(sock, '0')
@@ -468,10 +557,11 @@ class GCC_Commands(cmd.Cmd):
         else:
             print("Please enter a valid modulation frequency")
             return
-        
+
         # Updating the half-wavelength
         half_wavelength = speed_of_light / (2 * index_of_refraction * mod_freq)
         print("Modulation frequency changed to " + mod_freq_str)
+        max_distance_cm = half_wavelength * 100
         return
 
     # ======================= NHS
@@ -1121,8 +1211,8 @@ class GCC_Commands(cmd.Cmd):
         print("The colormap maxima are: ")
         print("     Amplitude minimum:", cm_min_amp)
         print("     Amplitude maximum:", cm_max_amp)
-        print("     Distance minimum:", cm_min_dist)
-        print("     Distance maximum:", cm_max_dist)
+        print("     Distance minimum (in cm):", user_min_distance_cm)
+        print("     Distance maximum (in cm):", user_max_distance_cm)
 
         # ======================= NHS
 
@@ -1139,7 +1229,7 @@ class GCC_Commands(cmd.Cmd):
         global cm_min_dist, cm_max_dist
         cm_min_dist = int(0)
         cm_max_dist = int(255)
-        
+
         # ====================== ADB
 
     def do_set_distance_colormap(self, arg):
@@ -1168,22 +1258,138 @@ class GCC_Commands(cmd.Cmd):
         cm_min_dist = int(args[0])
         cm_max_dist = int(args[1])
         return
-        
+
     # ======================= NHS (dev in progress, not currently being used)
-    
+
     def do_set_distance_colormap(self, arg):
         "Sets whether the distance image colormap is according to absolute distance or normalized distance"
         args = arg_to_argv(arg)
-        
+
         global distance_colormap
         if args[0] == 'normalized' or args[0] == 'n' or args[0] == 'N':
             distance_colormap = 'normalized'
         elif args[0] == 'absolute' or args[0] == 'a' or args[0] == 'A':
             distance_colormap = 'absolute'
         else:
-            print("Invalid arguments. Must be either 'absolute' or 'normalized'")   
+            print("Invalid arguments. Must be either 'absolute' or 'normalized'")
+
+
+    # ======================= ADB
+
+    def do_set_max_distance_cm(self, arg):
+        "Sets the maximum imaging distance in cm"
+        global max_distance_cm, user_max_distance_cm, min_distance_cm, cm_max_dist
+        args = arg_to_argv(arg)
+
+        if len(args) != 1:
+            logger.info("Invalid argument amount, see help\n")
+            return
+
+        user_val = int(args[0])
+        if user_val <= max_distance_cm and user_val >= min_distance_cm:
+            user_max_distance_cm = user_val
+            cm_max_dist = int((user_max_distance_cm/max_distance_cm)*255)
+        else:
+            print("Invalid arguments. Must be greater than 0 and less than ", str(max_distance_cm))
+
+    # ======================= ADB
+
+    def do_set_min_distance_cm(self, arg):
+        "Sets the maximum imaging distance in cm"
+        global max_distance_cm, user_min_distance_cm, min_distance_cm, cm_min_dist
+        args = arg_to_argv(arg)
+
+        if len(args) != 1:
+            logger.info("Invalid argument amount, see help\n")
+            return
+
+        user_val = int(args[0])
+        if user_val <= max_distance_cm and user_val >= min_distance_cm:
+            user_min_distance_cm = user_val
+            cm_min_dist = int((user_min_distance_cm / max_distance_cm) * 255)
+        else:
+            print("Invalid arguments. Must be greater than 0 and less than ", str(max_distance_cm))
 
     ###############################################################################
+    
+    # ======================= NHS
+    
+    def do_toggle_red_box(self):
+        "Toggles whether a red box will appear in the center of the image stream (primarily used for testing). No input arguments required"
+        global enable_red_box
+        if enable_red_box:
+            enable_red_box = False
+        else:
+            enable_red_box = True
+            
+    ###############################################################################
+    # Filtering Methods
+    ###############################################################################
+            
+    # ======================= NHS
+            
+    def do_toggle_median_filter(self, arg):
+        "Toggles the median filter on or off depending on current state. No input arguments required"
+        global enable_median_filter
+        if enable_median_filter:
+            enable_median_filter = False
+            print('Median filtering has been turned off')
+        else:
+            enable_median_filter = True
+            print('Median filtering has been turned on')
+            
+    # ======================= NHS
+    
+    def do_set_median_filter_kernel(self, arg):
+        "Sets the size of the median filter kernel size (assuming a square kernel). Expected arguments: kernel size as a positive, odd integer"
+        global median_filter_kernel
+        args = arg_to_argv(arg)
+        user_inp = int(args[0])
+        if user_inp % 2 == 0:
+            print('Kernel size must be an odd integer')
+            return
+        if user_inp < 0:
+            print('Kernel size must be positive')
+            return
+        median_filter_kernel = user_inp
+        print('Median filter kernel size set to ', median_filter_kernel)
+    
+    # ======================= NHS
+    
+    def do_toggle_low_pass_filter(self, arg):
+        "Toggles the low pass (Gaussian blur) filter on or off depending on current state. No input arguments required"
+        global enable_low_pass_filter
+        if enable_low_pass_filter:
+            enable_low_pass_filter = False
+            print('Low pass filtering has been turned off')
+        else:
+            enable_low_pass_filter = True
+            print('Low pass filtering has been turned on')
+    
+    # ======================= NHS
+    
+    def do_set_low_pass_filter_kernel(self, arg):
+        "Sets the size of the median filter kernel size (assuming a square kernel). Expected arguments: kernel size as a positive, odd integer"
+        global low_pass_filter_kernel
+        args = arg_to_argv(arg)
+        user_inp = int(args[0])
+        if user_inp % 2 == 0:
+            print('Kernel size must be an odd integer')
+            return
+        if user_inp < 0:
+            print('Kernel size must be positive')
+            return
+        low_pass_filter_kernel = user_inp
+        print('Low pass filter kernel size set to ', low_pass_filter_kernel)
+        
+    # ======================= NHS
+    
+    def do_get_class_methods(self):
+        commands = dir(self)
+        print(commands)
+        
+        
+        
     # Exit Method
     ###############################################################################
 
@@ -1193,6 +1399,21 @@ class GCC_Commands(cmd.Cmd):
         "Exit the program"
         logging.info("_GCC_TOF_CAM_ shut down successfully")
         return True
+    
+    
+    def do_blah(self, arg):
+        args = arg_to_argv(arg)
+        count = 0
+        for i in range(10):
+            print(i)
+        time.sleep(5)
+        
+    def do_write_something(self, arg):
+        file = open('write_to_me.txt', 'a')
+        file.write('hello there' + '\n')
+        file.close()
+        print('wrote something')
+
 
 # End of class
 
@@ -1230,6 +1451,7 @@ def generate_dynamic_framerate(filepath):
     # TODO: calculate the framerate
     return framerate
 
+
 def get_image(image_type, return_pre_subtracted_img):
     '''
     Returns background subtracted image by specified type. Note: this method
@@ -1247,49 +1469,44 @@ def get_image(image_type, return_pre_subtracted_img):
         img_dist_pre - pre-backscatter subtracted distance image
     '''
 
-    # For each frame get amplitude data
-    sock = build_tcp_connection()
-    amp = espros.do_getAmplitudeSorted(sock, 'raw')
-
     # For each frame getting data from camera
     wavelength = speed_of_light / (index_of_refraction * mod_freq)
-    if use_count_data: # uses count data
+    if use_count_data:  # uses count data
         sock = build_tcp_connection()
         amp = espros.do_getAmplitudeSorted(sock, 'raw')
         sock = build_tcp_connection()
         count_data = espros.do_getDistanceSorted(sock, 'raw')
-        dist = (wavelength / 2) * (count_data/30000.0) * 100 # distance array in cm
-        phase = count_data*2*np.pi/30000.0
-    else: # uses DCS data
+        dist = (wavelength / 2) * (count_data / 30000.0) * 100  # distance array in cm
+        phase = count_data * 2 * np.pi / 30000.0
+    else:  # uses DCS data
         sock = build_tcp_connection()
         dcs0, dcs1, dcs2, dcs3 = espros.do_getDCSSorted(sock, 'raw')
 
         # Calculating amplitude and phase from DCS
-        amp = np.sqrt(((dcs3 - dcs1)/2)**2 + ((dcs2 - dcs0)/2)**2)
-        amp = np.nan_to_num(amp) # converting NaN's to zeros
+        amp = np.sqrt(((dcs3 - dcs1) / 2) ** 2 + ((dcs2 - dcs0) / 2) ** 2)
+        amp = np.nan_to_num(amp)  # converting NaN's to zeros
         phase = np.pi + np.arctan2((dcs3 - dcs1), (dcs2 - dcs0))
-        dist = (wavelength / 2) * phase * 100 / (2*np.pi) # distance in cm
+        dist = (wavelength / 2) * phase * 100 / (2 * np.pi)  # distance in cm
         dist = np.nan_to_num(dist)
-        
+        print("dist pre backscatter")
+        print(dist[120][180])
+        print("\n")
+
     # Returning amplitude and phase data
     if image_type == 'phasor_data':
         return amp, phase
-        
+
     # Calculating observed phasor
     observed_phasor = amp * np.exp(1j * phase)
 
     # Implement background subtraction
     object_phasor = observed_phasor - backscatter_phasor
     imgAmp = np.sqrt(object_phasor.real ** 2 + object_phasor.imag ** 2)
-    imgAmp = np.nan_to_num(imgAmp) # converting NaN's to zeros
-    #print('Amplitudes post phasor : ' + str(imgAmp[100:200, 100:200]))
+    imgAmp = np.nan_to_num(imgAmp)  # converting NaN's to zeros
 
     object_phase = wrapTo2Pi(np.arctan2(object_phasor.imag, object_phasor.real))
-    imgDist = object_phase * (wavelength / 2) * 100 / (2 * np.pi) # backscatter subtracted distance array in cm
-    imgDist = np.nan_to_num(imgDist) # converting NaN's to zeros
-    print("dist")
-    print(dist[120][180])
-    print("\n\n")
+    imgDist = object_phase * (wavelength / 2) * 100 / (2 * np.pi)  # backscatter subtracted distance array in cm
+    imgDist = np.nan_to_num(imgDist)  # converting NaN's to zeros
 
     # Return based on specified data type
     if image_type == 'amplitude':
@@ -1308,6 +1525,7 @@ def get_image(image_type, return_pre_subtracted_img):
         else:
             return imgAmp, imgDist
 
+
 def rescale_amplitude_colormap(img):
     # Implements the colormap cutoffs
     img[img > cm_max_amp] = cm_max_amp
@@ -1317,26 +1535,24 @@ def rescale_amplitude_colormap(img):
     img = (255.0 * (img - cm_min_amp) / float(cm_max_amp)).astype(int)
     return img
 
+
 def rescale_distance_colormap(img):
     # implements the colormap cutoffs
-    
-    if distance_colormap == "normalized":
-        maxVal = np.ndarray.max(img)
-        img = img/float(maxVal) # normalizes by the maximum distance
-    else:
-        #img[img > cm_max_dist] = cm_max_dist
-        #img[img < cm_min_dist] = cm_min_dist
-        #img = (255.0 * (img - cm_min_dist) / float(cm_max_dist)).astype(int)
-        img = img/(half_wavelength*100) # "normalizes" by the half wavelength
 
-    # rescale from [0,255]
-    img = (255*img).astype(int)
+    #limit the distance values to be within the user's given range
+    img[img > user_max_distance_cm] = user_max_distance_cm
+    img[img < user_min_distance_cm] = user_min_distance_cm
+
+    #rescales from user range to 0-255 for colormap
+    img = (255.0 * (img - user_min_distance_cm) / float(user_max_distance_cm)).astype(int)
     return img
+
 
 def wrapTo2Pi_scalar(number):
     if number < 0:
-        number = 2*np.pi + number
+        number = 2 * np.pi + number
     return number
+
 
 def wrapTo2Pi(angles_array):
     for idxRow in range(0, 240):
@@ -1344,6 +1560,7 @@ def wrapTo2Pi(angles_array):
             if angles_array[idxRow][idxCol] < 0:
                 angles_array[idxRow][idxCol] = 2 * np.pi + angles_array[idxRow][idxCol]
     return angles_array
+
 
 def writeIntegrationRegisters(s, a0, a1, a2, a3):
     writeRegister(s, 'a0', a0)
@@ -1363,11 +1580,11 @@ def check_and_get_directory():
     # Checks to see if the current output directory exists, if not, creates it
     if working_dir and experiment_name:
         file_path = working_dir + "\\" + experiment_name
-    elif not working_dir and not experiment_name: # if both working_dir and experiment_name are empty
+    elif not working_dir and not experiment_name:  # if both working_dir and experiment_name are empty
         return ""
-    elif not working_dir and experiment_name: # if working_dir is empty and experiment_name is a path
+    elif not working_dir and experiment_name:  # if working_dir is empty and experiment_name is a path
         file_path = experiment_name
-    elif working_dir and not experiment_name: # if working dir is a path and experiment_name is empty
+    elif working_dir and not experiment_name:  # if working dir is a path and experiment_name is empty
         file_path = working_dir
     else:
         logger.info("Unknown filepath. Images will be saved to the directory where the run scripts are located")
