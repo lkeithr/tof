@@ -9,13 +9,13 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
-from pyreadline3 import Readline
 import time
+import platform
 
 
 # ROS dependencies
 if platform.system() == 'Linux':
-    from ros_start import ROS_preloop, ROS_postloop, stream_amp_and_dist_over_ROS
+    from ros_start import *
 
 # enables autocomplete on Windows, cause apparently
 # # python doesn't ship with a version of readline that
@@ -91,7 +91,6 @@ class GCC_Commands(cmd.Cmd):
     ###########################################################################
     def preloop(self):
         try:
-            ROS_func = ROS_preloop
             ROS_preloop(self)
         except NameError:
             # do nothing cause ROS code not here :(
@@ -100,8 +99,7 @@ class GCC_Commands(cmd.Cmd):
 
     def postloop(self):
         try:
-            ROS_func = ROS_postloop
-            ROS_func(self)
+            ROS_postloop(self)
         except NameError:
             # do nothing cause ROS code not here :(
             print("Error: error.")
@@ -109,8 +107,7 @@ class GCC_Commands(cmd.Cmd):
     def do_ros(self, arg):
         "Streams amplify and distance image to ROS"
         try:
-            ROS_func = stream_amp_and_dist_over_ROS
-            ROS_func(self, arg)
+            stream_amp_and_dist_over_ROS(self)
         except NameError:
             print("ERROR: ROS is not installed, delete System32")
 
@@ -252,7 +249,7 @@ class GCC_Commands(cmd.Cmd):
 
         stream_type = args[0]
         if (stream_type != 'amplitude' and stream_type != 'a' and stream_type != 'distance' and stream_type != 'd'):
-            logger.info("Invalid argument - must be either ""amplitude"" or ""distance""")
+            logger.info("Invalid argument - must be either 'amplitude' or 'distance'")
             return
 
         if len(args) == 1:
@@ -265,7 +262,7 @@ class GCC_Commands(cmd.Cmd):
                     save_image_data = False
                     break
                 else:
-                    print('Unrecognized input. Must be ''yes'' or ''no''')
+                    print("Unrecognized input. Must be 'yes' or 'no'")
         else:
             if args[1] == 'y':
                 save_image_data = True

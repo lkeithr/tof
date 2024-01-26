@@ -28,6 +28,7 @@ class VideoStreamer(Node):
         self.bridge = CvBridge()
 
     def publish_frames(self):
+        from GCC_API import get_image # this is needed cause python is stupid for some reason
         while rclpy.ok():
             img_amp_data, img_dist_data = get_image('nothing_really_matters', False)
             normalized_amp = np.array(255 * img_amp_data / np.max(img_amp_data), dtype = np.uint8)
@@ -47,18 +48,18 @@ class VideoStreamer(Node):
         super().destroy_node()
 
 # these functions should be injected into the GCC_Commands class
-def ROS_preloop(self):
+def ROS_preloop(instance):
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
-    self.video_streamer = VideoStreamer()
+    instance.video_streamer = VideoStreamer()
 
-def ROS_postloop(self):
-    self.video_streamer.destroy()
+def ROS_postloop(instance):
+    instance.video_streamer.destroy()
     rclpy.shutdown()
 
-def stream_amp_and_dist_over_ROS(self, arg):
+def stream_amp_and_dist_over_ROS(instance):
     "Streams amplify image to 'video_frames'"
     try:
-        self.video_streamer.publish_frames()
+        instance.video_streamer.publish_frames()
     except KeyboardInterrupt:
         print("ROS stream finished")
 
