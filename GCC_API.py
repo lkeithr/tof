@@ -95,7 +95,7 @@ class GCC_Commands(cmd.Cmd):
         except NameError:
             # do nothing cause ROS code not here :(
             # bullying will continue until OS improves
-            print("Error: your OS choice is disturbing")
+            print("Celebration: your OS choice is really good - better than MAC and Linux !")
 
     def postloop(self):
         try:
@@ -1385,6 +1385,38 @@ class GCC_Commands(cmd.Cmd):
         commands = dir(self)
         print(commands)
         
+    # ======================= NHS
+    
+    def do_temperature_test(self, arg):
+        'Test method to characterize temperature behavior - don''t run due to filepath dependencies'
+        
+        password = input('Password: ')
+        if not password == 'abcdefg':
+            print('Incorrect password')
+            return
+        
+        totalTime_min = 25
+        timeStep_sec = 15
+        numFrames = 5
+        
+        N = int(totalTime_min*60/timeStep_sec) + 1
+        dist = np.zeros(N)
+        timeVals = np.arange(0, totalTime_min + timeStep_sec/60, step=timeStep_sec/60)
+        
+        for i in range(N):
+            distVals = np.zeros(5)
+            for j in range(numFrames):
+                imgDist = get_image('distance', False)
+                print(imgDist.size)
+                distVals[j] = np.mean(imgDist[115:124, 175:184])
+                print(distVals[j])
+            dist[i] = np.mean(distVals)
+            time.sleep(timeStep_sec)
+        
+        np.savetxt('C:/Users/STUYCKNH19/OneDrive - Grove City College/Documents/GCC/Research/time_data.txt', 
+                   timeVals, delimiter=',')
+        np.savetxt('C:/Users/STUYCKNH19/OneDrive - Grove City College/Documents/GCC/Research/dist_data.txt', 
+                   dist, delimiter=',')
         
         
     # Exit Method
