@@ -270,7 +270,7 @@ class GCC_Commands(cmd.Cmd):
                 save_image_data = False
             
         # Creating a window to display the stream
-        cv2.namedWindow('Stream - Press ''enter'' to exit', cv2.WINDOW_FULLSCREEN) # set to cv2.WINDOW_NORMAL?
+        cv2.namedWindow('Stream - Press ''enter'' to exit', cv2.WINDOW_NORMAL) # set to cv2.WINDOW_NORMAL?
         cv2.setWindowProperty('Stream - Press ''enter'' to exit', cv2.WND_PROP_TOPMOST, 1)
         print('Stream started - Press ''enter'' to exit'' or press ''spacebar'' to save an image')
 
@@ -1311,7 +1311,7 @@ class GCC_Commands(cmd.Cmd):
     
     # ======================= NHS
     
-    def do_toggle_red_box(self):
+    def do_toggle_red_box(self, arg):
         "Toggles whether a red box will appear in the center of the image stream (primarily used for testing). No input arguments required"
         global enable_red_box
         if enable_red_box:
