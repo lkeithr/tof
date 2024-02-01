@@ -1395,7 +1395,7 @@ class GCC_Commands(cmd.Cmd):
             print('Incorrect password')
             return
         
-        totalTime_min = 25
+        totalTime_min = 45
         timeStep_sec = 15
         numFrames = 5
         
@@ -1407,11 +1407,11 @@ class GCC_Commands(cmd.Cmd):
             distVals = np.zeros(5)
             for j in range(numFrames):
                 imgDist = get_image('distance', False)
-                print(imgDist.size)
                 distVals[j] = np.mean(imgDist[115:124, 175:184])
-                print(distVals[j])
             dist[i] = np.mean(distVals)
+            print(i*timeStep_sec/60, 'minutes elapsed')
             time.sleep(timeStep_sec)
+            
         
         np.savetxt('C:/Users/STUYCKNH19/OneDrive - Grove City College/Documents/GCC/Research/time_data.txt', 
                    timeVals, delimiter=',')
