@@ -181,13 +181,19 @@ class Espros_Commands(cmd.Cmd):
         # TODO: make function
         return
 
-    def do_getTemperature(s, parms):
-        # TODO: make function
-        return
+    def do_getTemperature(s):
+        "returns an an array of six temperature readings on the Espros unit in °C"
+        # order is [top left (chip), top right (chip), bottom left (chip), bottom right (chip), ADC4 (LED top), ADC2 (LED bottom)]
+        s.sendall(bytes(('getTemperature\n').encode('ascii'))) # this api call takes no arguments
+        temperatureArray = s.recv(buffer)
+        return np.frombuffer(temperatureArray, np.dtype('uint16'), -1) / 10 # cast bytestring to uint16, then convert from deci-degrees C to deg C
 
-    def do_getAveragedTemperature(s, parms):
-        # TODO: make function
-        return
+    def do_getAveragedTemperature(s):
+        "returns the averaged chip temperature (tl, tr, bl, br) in °C"
+        # Note that this command requires the Beaglebone to do extra computation after it calls `getTemperatures` and then averages the first four (chip) temps
+        s.sendall(bytes(('getAveragedTemperature\n').encode('ascii'))) # This api call takes no arguments
+        reply = s.recv(buffer)
+        return int.from_bytes(reply, byteorder='little') / 40 # convert uint16 to integer, then divide by (4 temps * 10 deciDegrees/degree)
 
     def do_getChipInfo(s, parms):
         # TODO: make function
@@ -213,13 +219,12 @@ class Espros_Commands(cmd.Cmd):
         # TODO: make function
         return
 
-    def do_getModulationFrequencies(s, parms):
-        # TODO: make function
-        return
-
-    def do_getCalibrationTypeForFreqIdx(s, parms):
-        # TODO: make function
-        return
+    def do_getModulationFrequencies(s):
+        msg = "getModulationFrequencies\n"
+        s.sendall(bytes(msg.encode('ascii')))
+        reply = s.recv(buffer)
+        reply_as_array = np.frombuffer(reply, np.dtype('uint16'), -1)
+        return reply_as_array[1::2]  # only return odd-indexed elements; rest are zeros
 
     def do_enableIllumination(s, parms):
         msg = 'enableIllumination' + str(parms) + '\n'
@@ -287,9 +292,34 @@ class Espros_Commands(cmd.Cmd):
         s.sendall(bytes(msg.encode('ascii')))
         return
 
+    def do_getCalibrationTypeForFreqIdx(s, parms):
+        # returns calibration type (or None)
+        # input: an integer [0,7] corresponding to index of modulation frequency
+        msg = "getCalibrationTypeForFreqIdx " + str(parms).strip() + '\n'
+        s.sendall(bytes(msg.encode('ascii')))
+        reply = s.recv(buffer)
+        return int.from_bytes(reply, byteorder='little')
+
     def do_selectMode(s, parms):
         # TODO: make function
         return
+
+    def do_EnableTemperatureCorrection(s, parms):
+        "sets a flag within the Beaglebone code that applies temperature correction to distance and amplitude measurements"
+        # note: the boolean flag to enable temperature correction will be overridden to False if no distance
+        # calibration has been performed if parms='1', enable; if parms='0', disable calling this api command always
+        # returns int 0 (will ignore)
+        s.sendall(bytes(('correctTemperature ' + str(parms).strip() + '\n').encode('ascii')))
+
+    def do_getIsTemperatureCorrectionEnabled(s):
+        "note: the boolean flag to enable temperature correction will be overridden to False if no distance calibration has been performed"
+        s.sendall(bytes(('isTemperatureCorrectionEnabled\n').encode('ascii')))  # this api call takes no arguments
+        reply = s.recv(buffer)
+        reply_as_int = int.from_bytes(reply, byteorder='little')
+        if reply_as_int == 1:
+            return True
+        else:
+            return False
 
     def do_exit(self, arg):
         "Exit the program"
