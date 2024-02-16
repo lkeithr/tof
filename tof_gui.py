@@ -30,7 +30,7 @@ class ToFGUI:
         
         
         # Creating an image frame
-        self.create_image_frame()
+        #self.create_image_frame()
         
         # Testing webcam methods
         #self.cam = cv.VideoCapture(0)
@@ -39,6 +39,9 @@ class ToFGUI:
         
         
         # Add "CLI"
+        self.create_stream_mode_option()
+        self.create_save_option()
+        self.create_stream_button()
         self.create_CLI_output()
         self.create_CLI_input()
         self.cliInput.focus()
@@ -113,6 +116,49 @@ class ToFGUI:
         self.cliOutput.pack()
         
         
+    def create_stream_mode_option(self):
+        streamModeButtonStyle = ttk.Style()
+        streamModeButtonStyle.configure('streamModeButton.TRadiobutton', font=('Arial', stdFontSize, 'bold'))
+        self.streamMode = tk.StringVar(value='a')
+        self.amplitudeButton = ttk.Radiobutton(self.mainTab, text='Amplitude', 
+                                               variable=self.streamMode, 
+                                               value='a', 
+                                               style='streamModeButton.TRadiobutton')
+        self.distanceButton = ttk.Radiobutton(self.mainTab, text='Distance', 
+                                              variable=self.streamMode, 
+                                              value='d', 
+                                              style='streamModeButton.TRadiobutton')
+        self.amplitudeButton.pack()
+        self.distanceButton.pack()
+        
+    
+    def create_save_option(self):
+        self.saveState = tk.IntVar()
+        self.saveCheckbox = tk.Checkbutton(self.mainTab, text='Save Image Data?', 
+                                           font=('Arial', stdFontSize), 
+                                           variable=self.saveState)
+        self.saveCheckbox.pack()
+        
+        
+    def create_stream_button(self):
+        boldStyle = ttk.Style()
+        boldStyle.configure('Bold.TButton', font=('Arial', 14, 'bold'))
+        self.streamButton = ttk.Button(self.mainTab, text='Stream',
+                                       style='Bold.TButton', command=self.stream_command)
+        self.streamButton.pack()
+    
+        
+    def stream_command(self):
+        if self.saveState.get() == 1:
+            saveImageData = 'y'
+        else:
+            saveImageData = 'n'
+        self.cliProcess.stdin.write('stream ' + self.streamMode.get() + ' ' + saveImageData + '\n')
+        self.cliProcess.stdin.flush()
+        print('Command sent to CLI')
+        print('stream ' + self.streamMode.get() + ' ' + saveImageData + '\n')
+        
+        
     def enter_command(self, event):
         # handles commands sent through the GUI command line
         if self.cliInputText.get() == 'clc' or self.cliInputText.get() == 'clear': # clear history
@@ -133,7 +179,7 @@ class ToFGUI:
     def read_CLI_output(self, event: threading.Event):
         # reads the stdout from the CLI and puts it in the GUI
         while True:
-            output = self.cliProcess.stdout.read1()
+            output = self.cliProcess.stdout.readline()
             self.cliOutput.insert(tk.END, output)
             self.cliOutput.insert(tk.END, '')
             self.cliOutput.yview(tk.END) # moves the history box to the bottom
@@ -168,7 +214,8 @@ def main():
         cliProcess = subprocess.Popen(['python3', 'tof.py', '-gui'],
                                         shell=False, stdin=subprocess.PIPE,
                                         stdout=subprocess.PIPE, text=True, 
-                                        start_new_session=True) #as cliProcess:
+                                        start_new_session=True, bufsize=1, 
+                                        universal_newlines=True) #as cliProcess:
         root = ToFGUI(cliProcess)
         root.root.mainloop()
         cliProcess.terminate()

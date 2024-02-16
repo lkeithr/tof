@@ -9,10 +9,22 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
-from pyreadline3 import Readline
 import time
+import platform
 
-readline = Readline()  # enables tab-autocomplete
+
+# ROS dependencies
+if platform.system() == 'Linux':
+    from ros_start import *
+
+# enables autocomplete on Windows, cause apparently
+# # python doesn't ship with a version of readline that
+# # works on Windows
+# # further proof that Windows is a horrible OS
+# # and this year is the year of the Linux desktop
+if platform.system() == 'Windows':
+    from pyreadline3 import Readline
+    readline = Readline()  # enables tab-autocomplete
 
 # Define IPv4 address for the ToF camera
 PORT = 50660
@@ -73,6 +85,31 @@ class GCC_Commands(cmd.Cmd):
     intro = "Welcome to GCC ToF camera CLI (use help for list of commands)"
     prompt = "_GCC_TOF_CAM_: "
     ruler = ""
+
+    ###########################################################################
+    #                                ROS Stuff                                #
+    ###########################################################################
+    def preloop(self):
+        try:
+            ROS_preloop(self)
+        except NameError:
+            # do nothing cause ROS code not here :(
+            # bullying will continue until OS improves
+            print("Celebration: your OS choice is really good - better than MAC and Linux !")
+
+    def postloop(self):
+        try:
+            ROS_postloop(self)
+        except NameError:
+            # do nothing cause ROS code not here :(
+            print("Error: error.")
+
+    def do_ros(self, arg):
+        "Streams amplify and distance image to ROS"
+        try:
+            stream_amp_and_dist_over_ROS(self)
+        except NameError:
+            print("ERROR: ROS is not installed, delete System32")
 
     ###############################################################################
     # Backscatter Methods
@@ -206,28 +243,35 @@ class GCC_Commands(cmd.Cmd):
 
         # Parsing inputs
         args = arg_to_argv(arg)
-        if len(args) != 1:
+        if len(args) > 2:
             logger.info("Invalid argument amount, see help\n")
             return
 
         stream_type = args[0]
         if (stream_type != 'amplitude' and stream_type != 'a' and stream_type != 'distance' and stream_type != 'd'):
-            logger.info("Invalid argument - must be either ""amplitude"" or ""distance""")
+            logger.info("Invalid argument - must be either 'amplitude' or 'distance'")
             return
 
-        while True:
-            userInput = input('Do you wish to save raw image data when saving images? Enter ''yes'' or ''no'':\n')
-            if userInput == 'yes' or userInput == 'YES' or userInput == 'Yes':
+        if len(args) == 1:
+            while True:
+                userInput = input('Do you wish to save raw image data when saving images? Enter ''yes'' or ''no'': ')
+                if userInput == 'yes' or userInput == 'YES' or userInput == 'Yes':
+                    save_image_data = True
+                    break
+                elif userInput == 'no' or userInput == 'NO' or userInput == 'No':
+                    save_image_data = False
+                    break
+                else:
+                    print("Unrecognized input. Must be 'yes' or 'no'")
+        else:
+            if args[1] == 'y':
                 save_image_data = True
-                break
-            elif userInput == 'no' or userInput == 'NO' or userInput == 'No':
-                save_image_data = False
-                break
             else:
-                print('Unrecognized input. Must be ''yes'' or ''no''')
-
+                save_image_data = False
+            
         # Creating a window to display the stream
-        cv2.namedWindow('Stream - Press ''enter'' to exit', cv2.WINDOW_NORMAL)
+        cv2.namedWindow('Stream - Press ''enter'' to exit', cv2.WINDOW_NORMAL) # set to cv2.WINDOW_NORMAL?
+        cv2.setWindowProperty('Stream - Press ''enter'' to exit', cv2.WND_PROP_TOPMOST, 1)
         print('Stream started - Press ''enter'' to exit'' or press ''spacebar'' to save an image')
 
         while True:
@@ -1267,7 +1311,7 @@ class GCC_Commands(cmd.Cmd):
     
     # ======================= NHS
     
-    def do_toggle_red_box(self):
+    def do_toggle_red_box(self, arg):
         "Toggles whether a red box will appear in the center of the image stream (primarily used for testing). No input arguments required"
         global enable_red_box
         if enable_red_box:
@@ -1341,6 +1385,38 @@ class GCC_Commands(cmd.Cmd):
         commands = dir(self)
         print(commands)
         
+    # ======================= NHS
+    
+    def do_temperature_test(self, arg):
+        'Test method to characterize temperature behavior - don''t run due to filepath dependencies'
+        
+        password = input('Password: ')
+        if not password == 'abcdefg':
+            print('Incorrect password')
+            return
+        
+        totalTime_min = 45
+        timeStep_sec = 15
+        numFrames = 5
+        
+        N = int(totalTime_min*60/timeStep_sec) + 1
+        dist = np.zeros(N)
+        timeVals = np.arange(0, totalTime_min + timeStep_sec/60, step=timeStep_sec/60)
+        
+        for i in range(N):
+            distVals = np.zeros(5)
+            for j in range(numFrames):
+                imgDist = get_image('distance', False)
+                distVals[j] = np.mean(imgDist[115:124, 175:184])
+            dist[i] = np.mean(distVals)
+            print(i*timeStep_sec/60, 'minutes elapsed')
+            time.sleep(timeStep_sec)
+            
+        
+        np.savetxt('C:/Users/STUYCKNH19/OneDrive - Grove City College/Documents/GCC/Research/time_data.txt', 
+                   timeVals, delimiter=',')
+        np.savetxt('C:/Users/STUYCKNH19/OneDrive - Grove City College/Documents/GCC/Research/dist_data.txt', 
+                   dist, delimiter=',')
         
         
     # Exit Method
