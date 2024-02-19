@@ -146,6 +146,12 @@ class ToFGUI:
         self.streamButton = ttk.Button(self.mainTab, text='Stream',
                                        style='Bold.TButton', command=self.stream_command)
         self.streamButton.pack()
+
+    
+    '''def create_path_labels(self):
+        self.workingDirLabel = ttk.Label(text=self.workingDir)
+
+        self.imageSaveFolderLabel = ttk.Label()'''
     
         
     def stream_command(self):
