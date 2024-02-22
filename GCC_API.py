@@ -594,7 +594,7 @@ class GCC_Commands(cmd.Cmd):
     # ======================== NHS
 
     def do_set_experiment_name(self, arg):
-        "Sets the experiment name (folder in working directory where images will be saved"
+        "Sets the experiment name (folder in working directory where images will be saved)"
 
         # Parsing inputs
         args = arg_to_argv(arg)

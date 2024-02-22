@@ -39,11 +39,13 @@ class ToFGUI:
         
         
         # Add "CLI"
+        self.create_path_labels()
         self.create_stream_mode_option()
         self.create_save_option()
         self.create_stream_button()
         self.create_CLI_output()
         self.create_CLI_input()
+        self.update_vars()
         self.cliInput.focus()
         #self.create_enter_button()
         
@@ -148,10 +150,14 @@ class ToFGUI:
         self.streamButton.pack()
 
     
-    '''def create_path_labels(self):
-        self.workingDirLabel = ttk.Label(text=self.workingDir)
+    def create_path_labels(self):
+        self.workingDir = tk.StringVar(value='Initializing...')
+        self.workingDirLabel = ttk.Label(self.mainTab, text=self.workingDir)
+        self.workingDirLabel.pack()
 
-        self.imageSaveFolderLabel = ttk.Label()'''
+        self.experimentDir = tk.StringVar(value='Initializing...')
+        self.imageSaveFolderLabel = ttk.Label(self.mainTab, text=self.experimentDir)
+        self.imageSaveFolderLabel.pack()
     
         
     def stream_command(self):
@@ -180,6 +186,20 @@ class ToFGUI:
             print('Command sent to CLI')
         self.cliInput.delete(0, tk.END) # clears the input box
         self.cliOutput.yview(tk.END) # moves the history box to the bottom
+        self.update_vars()
+
+
+    def update_vars(self):
+        self.cliProcess.stdin.write('get_working_directory' + '\n')
+        self.cliProcess.stdin.flush()
+        self.workingDir.set(self.cliOutput.get(tk.END))
+
+        self.cliProcess.stdin.write('get_experiment_name' + '\n')
+        self.cliProcess.stdin.flush()
+        self.experimentDir.set(self.cliOutput.get(tk.END))
+        
+
+
 
             
     def read_CLI_output(self, event: threading.Event):
