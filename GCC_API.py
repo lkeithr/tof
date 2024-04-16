@@ -18,10 +18,10 @@ if platform.system() == 'Linux':
     from ros_start import *
 
 # enables autocomplete on Windows, cause apparently
-# # python doesn't ship with a version of readline that
-# # works on Windows
-# # further proof that Windows is a horrible OS
-# # and this year is the year of the Linux desktop
+# python doesn't ship with a version of readline that
+# works on Windows
+# further proof that Windows is a horrible OS
+# and this year is the year of the Linux desktop
 if platform.system() == 'Windows':
     from pyreadline3 import Readline
     readline = Readline()  # enables tab-autocomplete
@@ -89,27 +89,35 @@ class GCC_Commands(cmd.Cmd):
     ###########################################################################
     #                                ROS Stuff                                #
     ###########################################################################
+
     def preloop(self):
         try:
-            ROS_preloop(self)
+            ros_preloop()
         except NameError:
             # do nothing cause ROS code not here :(
             # bullying will continue until OS improves
-            print("Celebration: your OS choice is really good - better than MAC and Linux !")
+            print("Say hi to Bill Gates for me, he's watching you though your webcam")
 
     def postloop(self):
         try:
-            ROS_postloop(self)
+            ros_postloop()
         except NameError:
-            # do nothing cause ROS code not here :(
-            print("Error: error.")
+            print("Yo, I put a backdoor in your HyperV")
 
     def do_ros(self, arg):
         "Streams amplify and distance image to ROS"
         try:
-            stream_amp_and_dist_over_ROS(self)
+            stream_amp_and_dist_over_ROS()
         except NameError:
             print("ERROR: ROS is not installed, delete System32")
+
+    def do_crab(self, arg):
+        "crab time"
+        try:
+            crab()
+        except NameError:
+            print("the crabs are sad")
+            print("you let them down")
 
     ###############################################################################
     # Backscatter Methods
