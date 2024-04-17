@@ -102,13 +102,13 @@ def stream_amp_and_dist_over_ROS():
             normalized_dist = np.array(255 * img_dist_data / np.max(img_dist_data), dtype = np.uint8)
 
             # normalized = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 3, 0)
-            # ^ uncomment for fun mode
+            # ^ uncomment for more fun mode
 
             amp_img = cv2.cvtColor(normalized_amp, cv2.COLOR_GRAY2BGR)
             dist_img = cv2.cvtColor(normalized_dist, cv2.COLOR_GRAY2BGR)
             inverted_dist_img = np.invert(dist_img)
 
-            amp_msg = bridge.cv2_to_imgmsg(img_amp_data)
+            amp_msg = bridge.cv2_to_imgmsg(normalized_amp)
             dist_msg = bridge.cv2_to_imgmsg(inverted_dist_img)
 
             amp_publisher.publish(amp_msg)
