@@ -663,7 +663,7 @@ class GCC_Commands(cmd.Cmd):
 
         for i in range(0, 256):
             hex_str = hex(i)[2:] # remove '0x' at front
-            hex_str += "0" * (2-len(s)) # pad with extra zero if necessary
+            hex_str_padded = "0" * (2-len(hex_str)) + hex_str # pad with extra zero if necessary
             sock = build_tcp_connection()
             espros.do_readRegister(sock, hex_str_padded)
 
