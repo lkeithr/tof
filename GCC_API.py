@@ -294,9 +294,9 @@ class GCC_Commands(cmd.Cmd):
                 
 
             # Converting amplitude image to color
-            img_amp = rescale_amplitude_colormap(img_amp_data)
+            '''img_amp = rescale_amplitude_colormap(img_amp_data)
             colored_image_amp = CM(img_amp)
-            img_amp = (colored_image_amp[:, :, :3] * 255).astype(np.uint8)
+            img_amp = (colored_image_amp[:, :, :3] * 255).astype(np.uint8)'''
             img_amp = cv2.flip(img_amp, 1)
 
             # Converting distance image to color
