@@ -111,6 +111,10 @@ class GCC_Commands(cmd.Cmd):
         except NameError:
             print("ERROR: ROS is not installed, delete System32")
 
+    def do_new_ros(self, arg):
+        "Streams amplify and distance image to ROS"
+        new_stream_amp_and_dist_over_ROS()
+
     def do_crab(self, arg):
         "crab time"
         try:

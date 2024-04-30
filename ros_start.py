@@ -77,6 +77,7 @@ def get_camera_info():
     xml_file_path = camera_info_files[0]
     tree = ET.parse(xml_file_path)
     camera_info = CameraInfo()
+    camera_info.header.frame_id = 'camera_link'
     camera_info.height = int(tree.find('Height').text)
     camera_info.width = int(tree.find('Width').text)
     camera_info.distortion_model = tree.find('DistortionModel').text
@@ -89,32 +90,77 @@ def get_camera_info():
 def stream_amp_and_dist_over_ROS():
     "Streams amplify image to 'video_frames'"
     from GCC_API import get_image # this is needed cause python is stupid for some reason
-    amp_publisher = rospy.Publisher('amp_frames', Image, queue_size=10)
-    dist_publisher = rospy.Publisher('dist_frames', Image, queue_size=10)
+    amp_publisher = rospy.Publisher('camera/rgb/image_raw', Image, queue_size=10)
+    dist_publisher = rospy.Publisher('camera/depth_registered/image_raw', Image, queue_size=10)
     camera_info_publisher = rospy.Publisher('camera_info', CameraInfo, queue_size=10)
     camera_info = get_camera_info()
     bridge = CvBridge()
     try:
         while not rospy.is_shutdown():
+            # these are backscatter images
+            # should be normal images by default
             img_amp_data, img_dist_data = get_image('nothing_really_matters', False)
 
             normalized_amp = np.array(255 * img_amp_data / np.max(img_amp_data), dtype = np.uint8)
-            normalized_dist = np.array(255 * img_dist_data / np.max(img_dist_data), dtype = np.uint8)
+            normalized_amp = np.fliplr(normalized_amp)
+            img_dist = np.array(img_dist_data, dtype = np.float32)
+            img_dist = np.fliplr(img_dist)
 
             # normalized = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 3, 0)
             # ^ uncomment for more fun mode
 
             amp_img = cv2.cvtColor(normalized_amp, cv2.COLOR_GRAY2BGR)
-            dist_img = cv2.cvtColor(normalized_dist, cv2.COLOR_GRAY2BGR)
-            inverted_dist_img = np.invert(dist_img)
+            # dist_img = cv2.cvtColor(normalized_dist, cv2.COLOR_GRAY2BGR)
+            # inverted_dist_img = np.invert(dist_img)
 
             amp_msg = bridge.cv2_to_imgmsg(normalized_amp)
-            dist_msg = bridge.cv2_to_imgmsg(inverted_dist_img)
+            dist_msg = bridge.cv2_to_imgmsg(img_dist)
+            
+            amp_msg.header.stamp = rospy.get_rostime()
+            amp_msg.header.frame_id = 'camera_link'
+            dist_msg.header.stamp = rospy.get_rostime()
+            dist_msg.header.frame_id = 'camera_link'
+            camera_info.header.stamp = rospy.get_rostime()
+            
+            amp_publisher.publish(amp_msg)
+            dist_publisher.publish(dist_msg)
+            camera_info_publisher.publish(camera_info)
+    except KeyboardInterrupt:
+        print("ROS stream finished")
+
+
+def new_stream_amp_and_dist_over_ROS():
+    "Streams amplify image to 'video_frames'"
+    from GCC_API import get_image # this is needed cause python is stupid for some reason
+    amp_publisher = rospy.Publisher('camera/rgb/image_raw', Image, queue_size=10)
+    dist_publisher = rospy.Publisher('camera/depth_registered/image_raw', Image, queue_size=10)
+    camera_info_publisher = rospy.Publisher('camera_info', CameraInfo, queue_size=10)
+    camera_info = get_camera_info()
+    bridge = CvBridge()
+    try:
+        while not rospy.is_shutdown():
+            # these are backscatter images
+            # should be normal images by default
+            img_amp_data, img_dist_data = get_image('nothing_really_matters', False)
+
+            print(img_amp_data)
+            img_amp = np.array(img_amp_data, dtype = np.float32)
+            img_amp = np.fliplr(img_amp)
+            img_dist = np.array(img_dist_data, dtype = np.float32)
+            img_dist = np.fliplr(img_dist)
+
+            amp_msg = bridge.cv2_to_imgmsg(img_amp)
+            dist_msg = bridge.cv2_to_imgmsg(img_dist)
+
+            amp_msg.header.stamp = rospy.get_rostime()
+            amp_msg.header.frame_id = 'camera_link'
+            dist_msg.header.stamp = rospy.get_rostime()
+            dist_msg.header.frame_id = 'camera_link'
+            camera_info.header.stamp = rospy.get_rostime()
 
             amp_publisher.publish(amp_msg)
             dist_publisher.publish(dist_msg)
             camera_info_publisher.publish(camera_info)
-
     except KeyboardInterrupt:
         print("ROS stream finished")
 
