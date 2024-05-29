@@ -445,11 +445,11 @@ class GCC_Commands(cmd.Cmd):
 
         int_time = arg_to_argv(arg)
         s = build_tcp_connection()
-        if int(int_time[0]) <= 4000:
+        if int(int_time[0]) <= 4000: # set integration time through the Beaglebone
             print("Integration time set to", int_time[0])
             s.sendall(bytes(('setIntegrationTime3D ' + str(int_time[0]) + '\n').encode('ascii')))
             integration_time = int(int_time[0])
-        elif int(int_time[0]) < 9000:
+        elif int(int_time[0]) < 9000: # the rest need to be set by setting the camera registers directly
             print("Integration time set to 6553 us")
             integration_time = 6553
             writeIntegrationRegisters(s, '00', '08', 'FF', 'FB')
